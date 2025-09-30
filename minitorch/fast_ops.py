@@ -104,7 +104,7 @@ class FastOps(TensorOps):
         Returns:
             New tensor data
         """
-
+        # print("YES")
         # Make these always be a 3 dimensional multiply
         both_2d = 0
         if len(a.shape) == 2:
@@ -160,7 +160,18 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         # TODO: Implement for Task 3.1.
-        raise NotImplementedError('Need to implement for Task 3.1')
+  
+
+        out_size = 1
+        for d in out_shape:
+            out_size *= d
+
+        for l in prange(out_size):
+            out_index = np.empty(len(out_shape), dtype=np.int64)
+            in_index = np.empty(len(in_shape), dtype=np.int64)
+            to_index(l, out_shape, out_index)
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+            out[index_to_position(out_index, out_strides)] = fn(in_storage[index_to_position(in_index, in_strides)])
 
     return njit(parallel=True)(_map)  # type: ignore
 
@@ -199,7 +210,32 @@ def tensor_zip(
         b_strides: Strides,
     ) -> None:
         # TODO: Implement for Task 3.1.
-        raise NotImplementedError('Need to implement for Task 3.1')
+        
+   
+
+        out_size = 1
+        for d in out_shape:
+            out_size *= d
+
+        #print(out_size)
+
+        for l in prange(out_size):
+            out_index = np.empty(len(out_shape), dtype=np.int64)
+            in_index_a = np.empty(len(a_shape), dtype=np.int64)
+            in_index_b = np.empty(len(b_shape), dtype=np.int64) 
+            to_index(l, out_shape, out_index)
+            # print(out_index)
+            broadcast_index(out_index, out_shape, a_shape, in_index_a)
+            broadcast_index(out_index, out_shape, b_shape, in_index_b)
+
+            #print(out_index)
+            #print(in_index_a, "1")
+            #print(in_index_b, "2")
+            #print(a_shape)
+            #print(b_shape)
+
+            out[index_to_position(out_index, out_strides)] = fn(a_storage[index_to_position(in_index_a, a_strides)], b_storage[index_to_position(in_index_b, b_strides)])
+
 
     return njit(parallel=True)(_zip)  # type: ignore
 
@@ -233,7 +269,24 @@ def tensor_reduce(
         reduce_dim: int,
     ) -> None:
         # TODO: Implement for Task 3.1.
-        raise NotImplementedError('Need to implement for Task 3.1')
+        
+        out_size = 1
+        for d in out_shape:
+            out_size *= d
+
+        for l in prange(out_size):
+            out_index = np.empty(len(out_shape), dtype=np.int64)
+            to_index(l, out_shape, out_index)
+            a_index = out_index.copy()
+
+
+            result = a_storage[index_to_position(a_index, a_strides)]
+            for i in range(1, a_shape[reduce_dim]):
+                a_index[reduce_dim] = i
+                result = fn(result, a_storage[index_to_position(a_index, a_strides)])
+            
+            out[index_to_position(out_index, out_strides)] = result
+        
 
     return njit(parallel=True)(_reduce)  # type: ignore
 
@@ -282,8 +335,127 @@ def _tensor_matrix_multiply(
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
-    # TODO: Implement for Task 3.2.
-    raise NotImplementedError('Need to implement for Task 3.2')
+    assert len(a_shape) == len(b_shape), "MISMATCHED DIMENSIONS"
+
+    out_size = 1
+    for d in out_shape:
+        out_size *= d
+
+
+    # print(out_size)
+
+    ss = len(a_shape)
+
+    for l in prange(out_size):
+        """out_index = np.empty(len(out_shape))
+        out_index = to_index(l, out_shape, out_index)
+
+
+        in_index_left = out_index.copy()
+        in_index_left = in_index_left[:len(in_index_left) - 1]
+
+        in_index_right = np.empty(len(out_index) - 1)
+        in_index_right[:l - 2] = out_index[:len(out_index) - 2].copy()
+        in_index_right[l - 2] = out_index[l - 2]
+        in_index_right[l - 1] = out_index[l - 1]"""
+
+        result = 0
+
+        C = out_shape[-1]
+        # B = a_shape[-1]
+        # A = out_shape[-2]
+
+        # print(A, B, C, "SHAPES")
+        # print(a_strides, b_strides, "STRIDES")
+        # print(out_shape, "OUT_SHAPE")
+        # print(a_shape, "A_SHAPE", b_shape, "B_SHAPE")
+
+        # last_out_index = l % C
+        # pred_last_out_index = ((l - last_out_index) // C) % A
+        
+        # right_index = ((l - last_out_index - pred_last_out_index * C) // A) * B + last_out_index
+        # left_index = ((l - last_out_index - pred_last_out_index * C) // C) * B + pred_last_out_index * B
+        right_index = 0
+        left_index = 0
+
+        last_index_value = l % C
+        left_sum = l
+
+        for i in range(len(a_shape)):
+
+
+            if i == 0:
+                if b_shape[ss - i - 1] == 1:
+                    right_index += 0 # BROADCAST
+                else:
+                    right_index += b_strides[ss - i - 1] * last_index_value
+                
+                next_pointer = ((left_sum - last_index_value) // out_shape[ss - i - 1]) % out_shape[ss - i - 2]
+                left_sum = (left_sum - last_index_value) // out_shape[ss - i - 1]
+                last_index_value = next_pointer
+                continue
+            
+            if i == 1:
+                if a_shape[ss - i - 1] == 1:
+                    left_index += 0 # BROADCAST
+                else:
+                    left_index += a_strides[ss - i - 1] * last_index_value
+                
+                next_pointer = ((left_sum - last_index_value) // out_shape[ss - i - 1]) % out_shape[ss - i - 2]
+                left_sum = (left_sum - last_index_value) // out_shape[ss - i - 1]
+                last_index_value = next_pointer
+                continue
+            
+
+            # print(a_shape[ss - i - 1], b_shape[ss - i - 1], "SHAPES")
+            
+            if a_shape[ss - i - 1] == 1 and b_shape[ss - i - 1] == 1:
+                continue
+
+            if a_shape[ss - i - 1] == 1 and b_shape[ss - i - 1] != 1:
+                left_index += 0
+                right_index += b_strides[ss - i - 1] * last_index_value
+
+            if a_shape[ss - i - 1] != 1 and b_shape[ss - i - 1] == 1:
+                right_index += 0
+                left_index += a_strides[ss - i - 1] * last_index_value
+
+            next_pointer = ((left_sum - last_index_value) // out_shape[ss - i - 1]) % out_shape[ss - i - 2]
+            left_sum = (left_sum - last_index_value) // out_shape[ss - i - 1]
+            last_index_value = next_pointer
+
+
+            #curr_stride_left *= a_shape[ss - i - 1]
+            #curr_stride_right *= b_shape[ss - i - 1]
+
+            
+
+
+        # print(left_index, right_index)
+            
+
+        for _ in range(a_shape[-1]):
+            # print(left_index, right_index)
+            result += a_storage[int(left_index)] * b_storage[int(right_index)]
+            left_index += a_strides[-1]
+            right_index += b_strides[-2]
+        
+
+        '''rl = l * B
+        li = rl % C 
+        pli = ((rl - li) // C) % B
+        p2li = (((rl - li) // C) - pli * B) % A
+
+        left_index_old = (rl - li - pli ) // C
+        right_index_old = ((rl - li - pli - p2li) // A) + li
+
+        for _ in range(a_shape[-1]):
+            # print(left_index, right_index)
+            result += a_storage[left_index_old] * b_storage[right_index_old]
+            left_index_old += a_strides[-1]
+            right_index_old += b_strides[-2]'''
+
+        out[l] = result
 
 
 tensor_matrix_multiply = njit(parallel=True, fastmath=True)(_tensor_matrix_multiply)

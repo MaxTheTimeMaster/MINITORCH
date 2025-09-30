@@ -264,8 +264,18 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        raise NotImplementedError('Need to implement for Task 2.3')
+        
+        out_index = [0] * len(out_shape)
+        in_index = [0] * len(in_shape)   
+
+        out_size = 1
+        for d in out_shape:
+            out_size *= d
+
+        for l in range(out_size):
+            to_index(l, out_shape, out_index)
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+            out[index_to_position(out_index, out_strides)] = fn(in_storage[index_to_position(in_index, in_strides)])
 
     return _map
 
@@ -310,7 +320,30 @@ def tensor_zip(
         b_strides: Strides,
     ) -> None:
         # TODO: Implement for Task 2.3.
-        raise NotImplementedError('Need to implement for Task 2.3')
+        out_index = [0] * len(out_shape)
+        in_index_a = [0] * len(a_shape)
+        in_index_b = [0] * len(b_shape)   
+   
+
+        out_size = 1
+        for d in out_shape:
+            out_size *= d
+
+        #print(out_size)
+
+        for l in range(out_size):
+            to_index(l, out_shape, out_index)
+            # print(out_index)
+            broadcast_index(out_index, out_shape, a_shape, in_index_a)
+            broadcast_index(out_index, out_shape, b_shape, in_index_b)
+
+            #print(out_index)
+            #print(in_index_a, "1")
+            #print(in_index_b, "2")
+            #print(a_shape)
+            #print(b_shape)
+
+            out[index_to_position(out_index, out_strides)] = fn(a_storage[index_to_position(in_index_a, a_strides)], b_storage[index_to_position(in_index_b, b_strides)])
 
     return _zip
 
@@ -340,8 +373,25 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        raise NotImplementedError('Need to implement for Task 2.3')
+
+        out_index = [0] * len(out_shape)
+        a_index = [0] * len(a_shape)   
+
+        out_size = 1
+        for d in out_shape:
+            out_size *= d
+
+        for l in range(out_size):
+            to_index(l, out_shape, out_index)
+            # print(out_index)
+            a_index = out_index.copy()
+            result = a_storage[index_to_position(a_index, a_strides)]
+            for i in range(1, a_shape[reduce_dim]):
+                a_index[reduce_dim] = i
+                result = fn(result, a_storage[index_to_position(a_index, a_strides)])
+            
+            out[index_to_position(out_index, out_strides)] = result
+        
 
     return _reduce
 

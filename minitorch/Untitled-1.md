@@ -1,0 +1,1 @@
+$f(x) = 1/x$ compute $d \times f'(x)$

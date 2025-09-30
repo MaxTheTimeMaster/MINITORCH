@@ -2,7 +2,7 @@ from typing import Callable, List, Tuple
 
 import pytest
 from hypothesis.strategies import lists
-from hypothesis import given, assume
+from hypothesis import given, assume, settings, HealthCheck
 
 
 from minitorch import MathTest
@@ -98,19 +98,6 @@ def test_eq(a: float) -> None:
 # that ensure that your operators obey basic
 # mathematical rules.
 
-
-@pytest.mark.task0_2
-@given(small_floats)
-def test_sigmoid(a: float) -> None:
-    """Check properties of the sigmoid function, specifically
-    * It is always between 0.0 and 1.0.
-    * one minus sigmoid is the same as sigmoid of the negative
-    * It crosses 0 at 0.5
-    * It is  strictly increasing.
-    """
-    # TODO: Implement for Task 0.2.
-
-
 @pytest.mark.task0_2
 @given(small_floats)
 def test_sigmoid(a: float) -> None:
@@ -128,6 +115,7 @@ def test_sigmoid(a: float) -> None:
     # This is simplified for the property test
 
 @pytest.mark.task0_2
+@settings(suppress_health_check=[HealthCheck.filter_too_much])
 @given(small_floats, small_floats, small_floats)
 def test_transitive(a: float, b: float, c: float) -> None:
     "Test the transitive property of less-than"
